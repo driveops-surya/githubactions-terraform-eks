@@ -1,0 +1,81 @@
+name: Terraform GitHub
+run-name: ${{ github.event.pull_request.title || github.event.merge_group.head_commit.message }}
+
+on:
+  pull_request:
+    types:
+      - opened
+      - reopened
+      - synchronize
+    paths-ignore:
+      - '.github/**'
+  merge_group:
+    types:
+      - checks_requested
+  workflow_call:
+
+jobs:
+  terraform:
+    name: Terraform ${{ github.event_name == 'merge_group' && 'Apply' || 'Plan' }}
+    runs-on:
+      - ${{ vars.GHA_DEPLOY_RUNNER }}
+
+    permissions:
+      contents: read
+      id-token: write
+
+    env:
+      TERRAFORM_DIR: ${{ github.workspace }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_wrapper: false
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: GithubActionsDeployments
+          aws-region: ap-south-1
+
+      - id: init
+        name: Run terraform init
+        run: |
+          terraform init
+        working-directory: ${{ env.TERRAFORM_DIR }}
+
+      - id: validate
+        name: Run terraform validate
+        run: |
+          terraform validate
+        env:
+          GITHUB_TOKEN: ${{ steps.github-app-token.outputs.token }}
+        working-directory: ${{ env.TERRAFORM_DIR }}
+
+      - id: plan
+        name: Run terraform plan
+        run: |
+          set +e;
+          terraform plan -input=false -out=tfplan -detailed-exitcode;
+          PLAN_EXITCODE=$?;
+          echo "exitcode=$PLAN_EXITCODE" | tee -a $GITHUB_OUTPUT;
+          if [[ $PLAN_EXITCODE == 2 ]];
+          then
+            exit 0;
+          else
+            exit $PLAN_EXITCODE;
+          fi
+        env:
+          GITHUB_TOKEN: ${{ steps.github-app-token.outputs.token }}
+        working-directory: ${{ env.TERRAFORM_DIR }}
+
+      - id: apply
+        if: ${{ steps.plan.outputs.exitcode == 2 && github.event_name == 'merge_group' }}
+        name: Run terraform apply
+        run: |
+          terraform apply -auto-approve -input=false tfplan;
+        env:
+          GITHUB_TOKEN: ${{ steps.github-app-token.outputs.token }}
+        working-directory: ${{ env.TERRAFORM_DIR }}
