@@ -47,6 +47,7 @@ jobs:
         name: Run terraform plan
         run: |
           set +e;
+          terraform force-unlock -force 32066296-2cda-301c-45f6-f5a930301736
           terraform plan -input=false -out=tfplan -detailed-exitcode;
           PLAN_EXITCODE=$?;
           echo "exitcode=$PLAN_EXITCODE" | tee -a $GITHUB_OUTPUT;
