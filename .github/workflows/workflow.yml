@@ -61,7 +61,6 @@ jobs:
         working-directory: ${{ env.TERRAFORM_DIR }}
 
       - id: apply
-        if: ${{ steps.plan.outputs.exitcode == 2 && github.event_name == 'merge_group' }}
         name: Run terraform apply
         run: |
           terraform apply -auto-approve -input=false tfplan;
