@@ -17,8 +17,7 @@ on:
 jobs:
   terraform:
     name: Terraform ${{ github.event_name == 'merge_group' && 'Apply' || 'Plan' }}
-    runs-on:
-      - ${{ vars.GHA_DEPLOY_RUNNER }}
+    runs-on: github-deploy
 
     permissions:
       contents: read
