@@ -2,17 +2,7 @@ name: Terraform--GitHub
 run-name: ${{ github.event.pull_request.title || github.event.merge_group.head_commit.message }}
 
 on:
-  pull_request:
-    types:
-      - opened
-      - reopened
-      - synchronize
-    paths-ignore:
-      - '.github/**'
-  merge_group:
-    types:
-      - checks_requested
-  workflow_call:
+  workflow_dispatch:
 
 jobs:
   terraform:
