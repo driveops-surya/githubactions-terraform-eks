@@ -3,21 +3,28 @@ run-name: ${{ github.event.pull_request.title || github.event.merge_group.head_c
 
 on:
   workflow_dispatch:
+  pull_request:
+    branches: [ main ]
+    types: [opened, synchronize, reopened]
 
 jobs:
   terraform:
-    name: Terraform ${{ github.event_name == 'merge_group' && 'Apply' || 'Plan' }}
+    name: Terraform ${{ github.event_name == 'pull_request' && 'Plan' || 'Apply' }}
     runs-on: self-hosted
 
     permissions:
       contents: read
       id-token: write
+      pull-requests: write  # Required for adding plan comments to PR
 
     env:
       TERRAFORM_DIR: ${{ github.workspace }}
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
 
       - uses: hashicorp/setup-terraform@v3
         with:
@@ -39,32 +46,47 @@ jobs:
         name: Run terraform validate
         run: |
           terraform validate
-        env:
-          GITHUB_TOKEN: ${{ steps.github-app-token.outputs.token }}
         working-directory: ${{ env.TERRAFORM_DIR }}
 
       - id: plan
         name: Run terraform plan
+        if: github.event_name == 'pull_request'
         run: |
           set +e;
           terraform force-unlock -force 32066296-2cda-301c-45f6-f5a930301736
           terraform plan -input=false -out=tfplan -detailed-exitcode;
           PLAN_EXITCODE=$?;
           echo "exitcode=$PLAN_EXITCODE" | tee -a $GITHUB_OUTPUT;
+          
+          # Create a formatted plan output
+          terraform show -no-color tfplan > plan_output.txt
+          
+          # Add plan as comment to PR
+          PLAN_COMMENT=$(cat plan_output.txt | sed 's/"/\\"/g' | sed ':a;N;$!ba;s/\n/\\n/g')
+          curl -X POST \
+            -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            -H "Accept: application/vnd.github.v3+json" \
+            https://api.github.com/repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/comments \
+            -d "{\"body\": \"**Terraform Plan Output:**\n\n\`\`\`\n$PLAN_COMMENT\n\`\`\`\"}"
+          
           if [[ $PLAN_EXITCODE == 2 ]];
           then
             exit 0;
           else
             exit $PLAN_EXITCODE;
           fi
-        env:
-          GITHUB_TOKEN: ${{ steps.github-app-token.outputs.token }}
         working-directory: ${{ env.TERRAFORM_DIR }}
 
       - id: apply
         name: Run terraform apply
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: |
           terraform apply -auto-approve -input=false tfplan;
-        env:
-          GITHUB_TOKEN: ${{ steps.github-app-token.outputs.token }}
+        working-directory: ${{ env.TERRAFORM_DIR }}
+
+      # Additional step to clean up plan file after apply
+      - name: Clean up plan file
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && success()
+        run: |
+          rm -f tfplan
         working-directory: ${{ env.TERRAFORM_DIR }}
