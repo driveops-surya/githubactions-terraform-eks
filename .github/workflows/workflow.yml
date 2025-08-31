@@ -15,7 +15,7 @@ jobs:
     permissions:
       contents: read
       id-token: write
-      pull-requests: write  # Required for adding plan comments to PR
+      pull-requests: write
 
     env:
       TERRAFORM_DIR: ${{ github.workspace }}
@@ -56,25 +56,25 @@ jobs:
           terraform plan -input=false -out=tfplan -detailed-exitcode;
           PLAN_EXITCODE=$?;
           echo "exitcode=$PLAN_EXITCODE" | tee -a $GITHUB_OUTPUT;
-          
+
           # Create a formatted plan output
           terraform show -no-color tfplan > plan_output.txt
-          
+
           # Add plan as comment to PR
           PLAN_COMMENT=$(cat plan_output.txt | sed 's/"/\\"/g' | sed ':a;N;$!ba;s/\n/\\n/g')
           curl -X POST \
-            -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
-            -H "Accept: application/vnd.github.v3+json" \
-            https://api.github.com/repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/comments \
-            -d "{\"body\": \"**Terraform Plan Output:**\n\n\`\`\`\n$PLAN_COMMENT\n\`\`\`\"}"
-          
+          -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+          -H "Accept: application/vnd.github.v3+json" \
+          https://api.github.com/repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/comments \
+          -d "{\"body\": \"**Terraform Plan Output:**\n\n\`\`\`\n$PLAN_COMMENT\n\`\`\`\"}"
+
           if [[ $PLAN_EXITCODE == 2 ]];
           then
-            exit 0;
-          else
-            exit $PLAN_EXITCODE;
-          fi
-        working-directory: ${{ env.TERRAFORM_DIR }}
+          exit 0;
+            else
+          exit $PLAN_EXITCODE;
+            fi
+          working-directory: ${{ env.TERRAFORM_DIR }}
 
       - id: apply
         name: Run terraform apply
@@ -88,4 +88,12 @@ jobs:
         if: github.event_name == 'push' && github.ref == 'refs/heads/main' && success()
         run: |
           rm -f tfplan
+        working-directory: ${{ env.TERRAFORM_DIR }}
+
+      # Manual destroy step
+      - id: destroy
+        name: Run terraform destroy (manual)
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          terraform destroy -auto-approve -input=false
         working-directory: ${{ env.TERRAFORM_DIR }}
