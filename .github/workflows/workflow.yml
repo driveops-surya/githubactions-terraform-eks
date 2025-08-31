@@ -89,3 +89,11 @@ jobs:
         run: |
           rm -f tfplan
         working-directory: ${{ env.TERRAFORM_DIR }}
+
+      # Manual destroy step
+      - id: destroy
+        name: Run terraform destroy (manual)
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          terraform destroy -auto-approve -input=false
+        working-directory: ${{ env.TERRAFORM_DIR }}
