@@ -1,8 +1,18 @@
-name: Terraform---GitHub
-run-name: ${{ github.event.pull_request.title || github.event.merge_group.head_commit.message }}
+name: Terraform GitHub
+run-name: ${{ github.event.pull_request.title || github.event.merge_group.head_commit.message || 'Manual Run' }}
 
 on:
   workflow_dispatch:
+    inputs:
+      action:
+        description: 'Terraform Action to Execute'
+        required: true
+        default: 'plan'
+        type: choice
+        options:
+          - plan
+          - apply
+          - destroy
   pull_request:
     branches: [ main ]
     types: [opened, synchronize, reopened]
@@ -11,7 +21,7 @@ on:
 
 jobs:
   terraform:
-    name: Terraform ${{ github.event_name == 'pull_request' && 'Plan' || 'Apply' }}
+    name: Terraform ${{ github.event_name == 'workflow_dispatch' && inputs.action || (github.event_name == 'pull_request' && 'Plan' || 'Apply') }}
     runs-on: self-hosted
 
     permissions:
@@ -52,7 +62,7 @@ jobs:
 
       - id: plan
         name: Run terraform plan
-        if: ${{ github.event_name == 'push' || github.event_name == 'pull_request' }}
+        if: ${{ github.event_name == 'pull_request' || github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.action == 'plan') }}
         run: |
           set +e;
           terraform plan -input=false -out=tfplan -detailed-exitcode;
@@ -62,40 +72,46 @@ jobs:
           # Create a formatted plan output
           terraform show -no-color tfplan > plan_output.txt
 
-          # Add plan as comment to PR
-          PLAN_COMMENT=$(cat plan_output.txt | sed 's/"/\\"/g' | sed ':a;N;$!ba;s/\n/\\n/g')
-          curl -X POST \
-          -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
-          -H "Accept: application/vnd.github.v3+json" \
-          https://api.github.com/repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/comments \
-          -d "{\"body\": \"**Terraform Plan Output:**\n\n\`\`\`\n$PLAN_COMMENT\n\`\`\`\"}"
+          # Add plan as comment to PR if it's a pull request
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            PLAN_COMMENT=$(cat plan_output.txt | sed 's/"/\\"/g' | sed ':a;N;$!ba;s/\n/\\n/g')
+            curl -X POST \
+            -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            -H "Accept: application/vnd.github.v3+json" \
+            https://api.github.com/repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/comments \
+            -d "{\"body\": \"**Terraform Plan Output:**\n\n\`\`\`\n$PLAN_COMMENT\n\`\`\`\"}"
+          fi
 
           if [[ $PLAN_EXITCODE == 2 ]];
           then
-          exit 0;
-            else
-          exit $PLAN_EXITCODE;
-            fi
-          working-directory: ${{ env.TERRAFORM_DIR }}
+            exit 0;
+          else
+            exit $PLAN_EXITCODE;
+          fi
+        working-directory: ${{ env.TERRAFORM_DIR }}
 
       - id: apply
         name: Run terraform apply
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' || (github.event_name == 'workflow_dispatch' && inputs.action == 'apply') }}
         run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            terraform plan -input=false -out=tfplan
+          fi
           terraform apply -auto-approve -input=false tfplan;
         working-directory: ${{ env.TERRAFORM_DIR }}
 
       # Additional step to clean up plan file after apply
       - name: Clean up plan file
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && success()
+        if: ${{ (github.event_name == 'push' && github.ref == 'refs/heads/main' || (github.event_name == 'workflow_dispatch' && inputs.action == 'apply')) && success() }}
         run: |
           rm -f tfplan
         working-directory: ${{ env.TERRAFORM_DIR }}
 
-      # Manual destroy step
+      # Destroy step
       - id: destroy
-        name: Run terraform destroy (manual)
-        if: github.event_name == 'workflow_dispatch'
+        name: Run terraform destroy
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.action == 'destroy' }}
         run: |
-          terraform destroy -auto-approve -input=false
+          terraform plan -destroy -out=tfplan
+          terraform apply -auto-approve -input=false tfplan
         working-directory: ${{ env.TERRAFORM_DIR }}
