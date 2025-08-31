@@ -30,6 +30,10 @@ resource "aws_eks_cluster" "main" {
   depends_on = [
     aws_iam_role_policy_attachment.cluster_policy
   ]
+
+  timeouts {
+    delete = "30m"
+  }
 }
 
 resource "aws_iam_role" "node" {
@@ -75,7 +79,13 @@ resource "aws_eks_node_group" "main" {
     min_size     = each.value.scaling_config.min_size
   }
 
+  lifecycle {
+    create_before_destroy = true
+    ignore_changes = [scaling_config[0].desired_size]
+  }
+
   depends_on = [
-    aws_iam_role_policy_attachment.node_policy
+    aws_iam_role_policy_attachment.node_policy,
+    aws_eks_cluster.main
   ]
 }

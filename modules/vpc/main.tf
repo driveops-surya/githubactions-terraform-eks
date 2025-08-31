@@ -62,6 +62,8 @@ resource "aws_nat_gateway" "main" {
   tags = {
     Name = "${var.cluster_name}-nat-${count.index + 1}"
   }
+
+  depends_on = [aws_internet_gateway.main]
 }
 
 resource "aws_route_table" "public" {
@@ -89,12 +91,18 @@ resource "aws_route_table" "private" {
   tags = {
     Name = "${var.cluster_name}-private-${count.index + 1}"
   }
+
+  lifecycle {
+    create_before_destroy = true
+  }
 }
 
 resource "aws_route_table_association" "private" {
   count          = length(var.private_subnet_cidrs)
   subnet_id      = aws_subnet.private[count.index].id
   route_table_id = aws_route_table.private[count.index].id
+
+  depends_on = [aws_subnet.private, aws_route_table.private]
 }
 
 resource "aws_route_table_association" "public" {
