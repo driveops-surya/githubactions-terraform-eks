@@ -52,7 +52,7 @@ jobs:
 
       - id: plan
         name: Run terraform plan
-        if: github.event_name == 'pull_request'
+        if: ${{ github.event_name == 'push' || github.event_name == 'pull_request' }}
         run: |
           set +e;
           terraform plan -input=false -out=tfplan -detailed-exitcode;
