@@ -1,4 +1,4 @@
-name: Terraform GitHub
+name: TerraformGitHub
 run-name: ${{ github.event.pull_request.title || github.event.merge_group.head_commit.message || 'Manual Run' }}
 
 on:
