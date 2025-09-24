@@ -30,7 +30,7 @@ jobs:
       pull-requests: write
 
     env:
-      TERRAFORM_DIR: ${{ github.workspace }}
+      TERRAFORM_DIR: ${{ github.workspace }}/terraform-eks
 
     steps:
       - uses: actions/checkout@v4
