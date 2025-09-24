@@ -22,13 +22,19 @@ The project creates:
 ```
 .
 ├── .github/workflows/         # GitHub Actions workflows
-├── modules/                  # Terraform modules
-│   ├── eks/                 # EKS cluster configuration
-│   └── vpc/                 # VPC configuration
-├── backend.tf               # S3 backend configuration
-├── main.tf                 # Main Terraform configuration
-├── variables.tf            # Input variables
-└── outputs.tf              # Output values
+├── terraform-eks/           # Terraform EKS configuration directory
+│   ├── modules/             # Terraform modules
+│   │   ├── eks/            # EKS cluster configuration
+│   │   └── vpc/            # VPC configuration
+│   ├── backend.tf          # S3 backend configuration
+│   ├── main.tf            # Main Terraform configuration
+│   ├── variables.tf       # Input variables
+│   └── outputs.tf         # Output values
+├── main.tf                # Legacy main configuration (kept for reference)
+├── backend.tf             # Legacy backend configuration (kept for reference)
+├── variables.tf           # Legacy variables configuration (kept for reference)
+├── outputs.tf             # Legacy outputs configuration (kept for reference)
+└── modules/               # Legacy modules directory (kept for reference)
 ```
 
 ## Configuration
@@ -48,17 +54,22 @@ The project creates:
 
 ## Usage
 
-1. Initialize Terraform:
+1. Navigate to the terraform-eks directory:
+```bash
+cd terraform-eks
+```
+
+2. Initialize Terraform:
 ```bash
 terraform init
 ```
 
-2. Review the changes:
+3. Review the changes:
 ```bash
 terraform plan
 ```
 
-3. Apply the configuration:
+4. Apply the configuration:
 ```bash
 terraform apply
 ```
@@ -95,6 +106,7 @@ Terraform state is stored in an S3 bucket:
 
 To destroy all resources:
 ```bash
+cd terraform-eks
 terraform destroy
 ```
 
