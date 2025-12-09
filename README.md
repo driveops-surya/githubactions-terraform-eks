@@ -2,7 +2,7 @@
 
 This repository contains Terraform configurations to deploy an Amazon EKS (Elastic Kubernetes Service) cluster with supporting infrastructure on AWS.
 
-## Architecture
+## Architectur
 
 The project creates:
 - VPC with public and private subnets across 3 availability zones
