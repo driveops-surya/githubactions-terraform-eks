@@ -22,7 +22,7 @@ on:
 jobs:
   terraform:
     name: Terraform ${{ github.event_name == 'workflow_dispatch' && inputs.action || (github.event_name == 'pull_request' && 'Plan' || 'Apply') }}
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
 
     permissions:
       contents: read
